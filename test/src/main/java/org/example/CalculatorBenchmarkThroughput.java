@@ -36,84 +36,57 @@ import org.example.calculator.CalculatorReduceImpl;
 import org.openjdk.jmh.annotations.*;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.DoubleStream;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-public class CalculatorBenchmark {
+public class CalculatorBenchmarkThroughput {
+
+    private static final Random RANDOM = new Random();
 
     private CalculatorReduceImpl calculatorReduceImpl;
 
     private CalculatorEnhancedForLoopImpl calculatorEnhancedForLoopImpl;
 
-    @State(Scope.Benchmark)
-    public static class NumbersState {
-        public BigDecimal[] numbers = new BigDecimal[]{
-                BigDecimal.valueOf(1),
-                BigDecimal.valueOf(5),
-                BigDecimal.valueOf(11),
-                BigDecimal.valueOf(13),
-                BigDecimal.valueOf(6),
-                BigDecimal.valueOf(7),
-        };
-    }
+    private BigDecimal[] numbers;
 
-    @State(Scope.Benchmark)
-    public static class VastNumbersState {
-        public BigDecimal[] numbers = new BigDecimal[]{
-                BigDecimal.valueOf(1),
-                BigDecimal.valueOf(5),
-                BigDecimal.valueOf(11),
-                BigDecimal.valueOf(13),
-                BigDecimal.valueOf(6),
-                BigDecimal.valueOf(7),
-        };
-
-        @Setup
-        public void setNumbers() {
-            BigDecimal[] bigDecimals = new BigDecimal[10000];
-            for (int i = 0; i < 10000; i++) {
-                bigDecimals[i] = BigDecimal.valueOf(i);
-            }
-
-            numbers = bigDecimals;
-        }
-    }
+    @Param({ "10", "100", "10000" })
+    private int numberSize;
 
     @Setup
     public void setupCalc() {
         calculatorReduceImpl = new CalculatorReduceImpl();
         calculatorEnhancedForLoopImpl = new CalculatorEnhancedForLoopImpl();
+
+        numbers = DoubleStream.generate(() -> RANDOM.nextDouble(100)) // Generate random numbers between 0 and 99
+                .limit(numberSize)
+                .mapToObj(number -> new BigDecimal(number, new MathContext(10, RoundingMode.HALF_UP)))
+                .toArray(BigDecimal[]::new);
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.SingleShotTime)
+    @BenchmarkMode(Mode.Throughput)
+    @Measurement(iterations = 1, time = 30)
     public void benchmarkBaseline() {
         // empty benchmark - sanity check
     }
 
 
     @Benchmark
-    @BenchmarkMode(Mode.SingleShotTime)
-    public BigDecimal benchmarkSumWithReduceSmallArray(CalculatorBenchmark calcState, NumbersState numbersState) {
-        return calcState.calculatorReduceImpl.sum(numbersState.numbers);
+    @BenchmarkMode(Mode.Throughput)
+    @Measurement(iterations = 3, time = 30)
+    public BigDecimal benchmarkSumWithReduce(CalculatorBenchmarkThroughput calcState) {
+        return calcState.calculatorReduceImpl.sum(calcState.numbers);
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.SingleShotTime)
-    public BigDecimal benchmarkSumWithReduceVastArray(CalculatorBenchmark calcState, VastNumbersState numbersState) {
-        return calcState.calculatorReduceImpl.sum(numbersState.numbers);
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.SingleShotTime)
-    public BigDecimal benchmarkSumWithEnhancedForLoopSmallArray(CalculatorBenchmark calcState, NumbersState numbersState) {
-        return calcState.calculatorEnhancedForLoopImpl.sum(numbersState.numbers);
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.SingleShotTime)
-    public BigDecimal benchmarkSumWithEnhancedForLoopVastArray(CalculatorBenchmark calcState, VastNumbersState numbersState) {
-        return calcState.calculatorEnhancedForLoopImpl.sum(numbersState.numbers);
+    @BenchmarkMode(Mode.Throughput)
+    @Measurement(iterations = 3, time = 30)
+    public BigDecimal benchmarkSumWithEnhancedForLoop(CalculatorBenchmarkThroughput calcState) {
+        return calcState.calculatorEnhancedForLoopImpl.sum(calcState.numbers);
     }
 }
